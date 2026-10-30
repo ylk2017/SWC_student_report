@@ -130,6 +130,12 @@ hr{border:0;border-top:1px solid var(--line);margin:22px 0}
 .class-card.active{background:var(--dark);color:#fff;border-color:var(--dark)}
 .class-card strong{font:23px var(--mono);display:block}
 .class-card small{opacity:.8;font-size:10px}
+.class-overview-panel{margin-top:20px}
+.class-overview-panel .kpis{margin:16px 0}
+.class-overview-panel .kpi-number{font-size:26px;overflow-wrap:anywhere}
+.class-overview-panel .kpi-note{white-space:pre-line}
+.class-overview-panel .mini-table{min-width:760px}
+.class-overview-students .mini-table{min-width:950px}
 .table-panel{padding:0;overflow:hidden;margin-top:18px}
 .table-toolbar{padding:17px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
 .table-scroll{overflow:auto;max-width:100%}
@@ -399,6 +405,7 @@ dialog[open]{animation:appear .2s ease}
                 開始匯入 CSV <span aria-hidden="true">↗</span>
               </button>
               <span class="tag good">家長簡明版 PDF</span>
+              <span class="tag">教師班級總覽 PDF／CSV</span>
             </div>
           </div>
           <div class="hero-art" aria-hidden="true">
@@ -468,6 +475,12 @@ dialog[open]{animation:appear .2s ease}
 
         <div id="classGrid" class="class-grid"></div>
 
+        <section
+          id="teacherClassOverview"
+          class="panel class-overview-panel"
+          aria-label="教師班級整體紀錄">
+        </section>
+
         <div class="selection-bar">
           <span class="selected-count" id="selectedCount">已選取 0 位</span>
           <label class="small" for="pdfAudienceQuick">PDF 版本</label>
@@ -529,6 +542,7 @@ dialog[open]{animation:appear .2s ease}
         <p class="data-caption">
           校內畫面保留來源及核對資訊。「未列項」不是所有來源均為零。
           有效獎懲排除已豁免紀錄；學年累積不因日期篩選而重算。
+          班級總覽 PDF／CSV 與學生個別 PDF／ZIP 分開建立。
         </p>
       </div>
     </section>
@@ -615,7 +629,7 @@ dialog[open]{animation:appear .2s ease}
 
           <div class="form-grid">
             <div class="field span-2">
-              <label for="pdfAudience">PDF 版本</label>
+              <label for="pdfAudience">學生 PDF 版本</label>
               <select id="pdfAudience" name="pdfAudience">
                 <option value="parent">家長簡明版（預設）</option>
                 <option value="internal">校內核對版</option>
@@ -625,6 +639,7 @@ dialog[open]{animation:appear .2s ease}
                 出席子欄只保留列示缺席日期數。
                 結語保留「請家長與學生一同檢視紀錄。」。
                 原始紀錄、校內工作台及校內核對版保持不變。
+                獨立班級總覽固定為校內用途，不受此學生版本選擇影響。
               </div>
             </div>
 
@@ -634,7 +649,7 @@ dialog[open]{animation:appear .2s ease}
             </div>
 
             <div class="field span-2">
-              <label for="reportTitle">報告標題</label>
+              <label for="reportTitle">學生報告標題</label>
               <input id="reportTitle" name="title" value="學生表現報告表" maxlength="80" required>
             </div>
 
@@ -697,8 +712,9 @@ dialog[open]{animation:appear .2s ease}
           <button type="submit" class="btn primary">套用設定</button>
 
           <p class="small muted" style="margin-top:10px">
-            版本設定同時適用於單人 PDF、所選學生 ZIP 及全班 ZIP。
+            學生版本設定同時適用於單人 PDF、所選學生 ZIP 及全班 ZIP。
             日期篩選於班級總覽設定；家長 PDF 不顯示起訖日期。
+            班級總覽另設獨立 PDF／CSV 下載。
           </p>
         </form>
 
@@ -718,6 +734,23 @@ dialog[open]{animation:appear .2s ease}
             <div class="notice warn">
               現有缺席報表不能用來推算實際出席日數，因此不會把缺席日期數誤標為出席天數。
             </div>
+          </div>
+
+          <div class="panel">
+            <h3>教師班級整體報告</h3>
+            <p class="small muted" style="margin-top:10px">
+              選擇一班後可獨立下載班級總覽 PDF 或 Excel 可開啟的 UTF-8 CSV。
+              包括遲到、缺席日期、缺點、欠功課及其他列示數據，可選擇加入學生明細。
+            </p>
+            <div class="notice">
+              遲到、欠功課及其他累積項目不按日期篩選重算。
+              未提供、未列項及未通過核對的資料不當作零。
+              班級報告以全班已匯入名單計算，不受姓名搜尋、勾選或分頁影響。
+            </div>
+            <p class="small muted" style="margin-top:10px">
+              此工具是本機工作台，不提供伺服器登入或班級存取權限控制。
+              班級總覽屬校內資料，請依校方政策處理。
+            </p>
           </div>
 
           <div class="panel">
@@ -2346,6 +2379,7 @@ function renderOverview(){
 
   if(!has){
     state.selected.clear();
+    renderClassOverview();
     updateExportButtons();
     return;
   }
@@ -2418,6 +2452,7 @@ function renderOverview(){
     "。日期篩選只用於缺席及獎懲明細；功課、用品及違規仍為來源學年累積。家長 PDF 不顯示起訖日期。";
 
   renderStudentTable();
+  renderClassOverview();
 }
 function renderStudentTable(){
   const rows=sortedStudents();
@@ -2982,6 +3017,7 @@ function renderStudentPanel(){
       node("div",{class:"source-selector"},
         sel,
         button("確認姓名",()=>{
+          if(locked())return;
           state.namePicks.set(s.key,{value:sel.value,signature:s.nameSignature});
           rebuild();
           renderStudentPanel();
@@ -3145,8 +3181,7 @@ function parentRowCount(c){
 
 /*
  * 家長版只產生第一至第三節、結語及簽署。
- * 不讀取缺席日期明細作顯示。
- * 不產生第四節、第五節、其附屬表格或說明。
+ * 不產生缺席日期明細、第四節、第五節及其附屬說明。
  * buildReport() 及校內核對版仍保留全部紀錄。
  */
 function makeParentReportSpecs(r){
@@ -3470,7 +3505,12 @@ function makeInternalReportSpecs(r){
   return a;
 }
 function makeReportSpecs(r){
-  return isParentReport(r)?makeParentReportSpecs(r):makeInternalReportSpecs(r);
+  if(r.reportType==="class-overview"){
+    return makeClassOverviewSpecs(r);
+  }
+  return isParentReport(r)
+    ?makeParentReportSpecs(r)
+    :makeInternalReportSpecs(r);
 }
 
 /* ==================== A4 實際量度分頁 ==================== */
@@ -3484,6 +3524,10 @@ async function layoutReady(){
   await nextFrame();
 }
 function createReportPage(r,continuation){
+  if(r.reportType==="class-overview"){
+    return createClassOverviewPage(r,continuation);
+  }
+
   const parent=isParentReport(r);
 
   const page=node("article",{
@@ -3512,7 +3556,7 @@ function createReportPage(r,continuation){
         "班別："+r.klass+"　學號："+String(r.no).padStart(2,"0"))
     );
 
-    // 家長版完全不產生報告期間欄位，而非只用 CSS 隱藏。
+    // 家長版不產生報告期間欄位，而非只以 CSS 隱藏。
     if(!parent){
       meta.append(node("div",{class:"full"},
         "報告期間："+periodText(r.options.start,r.options.end)));
@@ -3839,6 +3883,8 @@ function updateExportButtons(){
   $("previewPdf").textContent=
     state.previewReport&&isParentReport(state.previewReport)
       ?"下載家長版 PDF":"下載校內版 PDF";
+
+  updateClassOverviewButtons();
 }
 async function loadLibraries(){
   if(state.depsLoading)return;
@@ -3916,8 +3962,14 @@ async function createPdf(report,onProgress){
     });
 
     pdf.setProperties({
-      title:report.id+" Student Report",
-      subject:isParentReport(report)?"Parent student report":"Internal student report",
+      title:report.reportType==="class-overview"
+        ?report.year+" "+report.klass+" Class Overview"
+        :report.id+" Student Report",
+      subject:report.reportType==="class-overview"
+        ?"Internal class overview"
+        :isParentReport(report)
+          ?"Parent student report"
+          :"Internal student report",
       creator:"Student Record Studio"
     });
 
@@ -4338,6 +4390,780 @@ $("exportDialog").addEventListener("cancel",e=>{
   }
 });
 
+/* ==================== 教師班級總覽：獨立 PDF / CSV ==================== */
+
+let classOverviewWithStudents=false;
+
+const CLASS_OVERVIEW_DEFS=[
+  {
+    key:"late",label:"遲到（UT08）",
+    kind:"counter",code:"UT08",
+    basis:"來源學年累積",unit:"次"
+  },
+  {
+    key:"absence",label:"缺席列示日期",
+    kind:"absence",
+    basis:"所選日期範圍",unit:"學生×日期"
+  },
+  {
+    key:"demerit",label:"有效缺點",
+    kind:"award",code:"缺點",
+    basis:"所選日期範圍",unit:"次"
+  },
+  {
+    key:"hw",label:"欠功課（HW）",
+    kind:"counter",code:"HW",
+    basis:"來源學年累積",unit:"次"
+  },
+
+  ...["警告","小過","大過","優點","小功","大功"].map(code=>({
+    key:"award:"+code,
+    label:"有效"+code,
+    kind:"award",code,
+    basis:"所選日期範圍",unit:"次"
+  })),
+
+  ...[
+    ["UT01","缺席／遲到事宜（UT01）"],
+    ["BL01","欠帶手冊（BL01）"],
+    ["BL02","欠帶主科用品（BL02）"],
+    ["BL03","欠帶非主科用品（BL03）"],
+    ["BC","欠帶電子學習器材（BC）"],
+    ["LA","課堂違規（LA）"],
+    ["UF:1","校服儀容：第一分類"],
+    ["UF:2","校服儀容：第二分類"],
+    ["UF:3","校服儀容：第三分類"]
+  ].map(([code,label])=>({
+    key:"counter:"+code,
+    label,kind:"counter",code,
+    basis:"來源學年累積",unit:"次"
+  }))
+];
+
+const CLASS_OVERVIEW_HEADERS=[
+  "項目","統計口徑","合計",
+  "具列示紀錄學生","可計數／納入","資料缺口"
+];
+
+const CLASS_OVERVIEW_STUDENT_HEADERS=[
+  "班別／學號","姓名","遲到累積",
+  "缺席日期數","有效缺點","欠功課累積","資料狀態"
+];
+
+const CLASS_OVERVIEW_SOURCE_HEADERS=[
+  "來源及涵蓋範圍","來源期間",
+  "統計截至日","建立／最新事件","適用／採用學生數"
+];
+
+function classOverviewValue(r,d){
+  const missing=()=>({value:null,state:"missing"});
+  const safe=v=>Number.isSafeInteger(v)&&v>=0;
+
+  if(d.kind==="counter"){
+    const m=r.metrics[d.code];
+
+    if(!m||m.state==="missing"||m.state==="conflict"){
+      return missing();
+    }
+    if(m.state==="unlisted"){
+      return{value:null,state:"unlisted"};
+    }
+
+    return{
+      value:safe(m.value)?m.value:null,
+      state:m.state==="value"&&safe(m.value)?"value":"partial"
+    };
+  }
+
+  if(d.kind==="absence"){
+    if(!r.absence.known)return missing();
+
+    return{
+      value:safe(r.absence.count)?r.absence.count:null,
+      state:r.absence.partial||!safe(r.absence.count)
+        ?"partial":"value"
+    };
+  }
+
+  if(!r.sanctions.known)return missing();
+
+  const totals=r.sanctions.periodTotals;
+  const value=totals.totals[d.code];
+
+  // 缺漏操行分不會令已解析的獎懲「次數」變成未知。
+  return{
+    value:safe(value)?value:null,
+    state:totals.countPartial||!safe(value)?"partial":"value"
+  };
+}
+
+function buildClassOverviewReport(
+  students,options,includeStudents=false
+){
+  if(!students.length)return null;
+
+  const years=oneOf(students.map(s=>s.year));
+  const classes=oneOf(students.map(s=>s.klass));
+
+  if(years.length!==1||classes.length!==1){
+    throw new Error("班級總覽須按單一學年及單一班別建立。");
+  }
+
+  // 只修改本份班級報告，不改學生 PDF 的版本設定。
+  const reportOptions={
+    ...options,
+    title:"班級整體紀錄總覽",
+    pdfAudience:"internal"
+  };
+
+  const reports=students.slice().sort(studentOrder)
+    .map(s=>buildReport(s,reportOptions));
+
+  const rows=reports.map(r=>({
+    key:r.key,id:r.id,name:r.name,
+    excluded:r.blockers.length>0,
+    values:Object.fromEntries(
+      CLASS_OVERVIEW_DEFS.map(d=>[
+        d.key,classOverviewValue(r,d)
+      ])
+    ),
+    status:r.blockers.length
+      ?"未納入："+r.blockers.join("；")
+      :r.warnings.length
+        ?"無核對阻擋；來源提示 "+r.warnings.length+" 項"
+        :"無核對阻擋"
+  }));
+
+  // 未解決身分／快照衝突的學生不參與任何合計。
+  const included=rows.filter(s=>!s.excluded);
+  const excludedCount=rows.length-included.length;
+
+  const metrics=CLASS_OVERVIEW_DEFS.map(d=>{
+    const cells=included.map(s=>s.values[d.key]);
+    const numeric=cells.filter(c=>c.value!==null);
+
+    let total=numeric.length
+      ?numeric.reduce((sum,c)=>sum+c.value,0)
+      :null;
+
+    const overflow=total!==null&&!Number.isSafeInteger(total);
+    if(overflow)total=null;
+
+    return{
+      ...d,total,overflow,
+      affected:numeric.filter(c=>c.value>0).length,
+      counted:numeric.length,
+      included:included.length,
+      partial:numeric.filter(c=>c.state==="partial").length,
+      unparseable:cells.filter(c=>
+        c.state==="partial"&&c.value===null
+      ).length,
+      unlisted:cells.filter(c=>c.state==="unlisted").length,
+      missing:cells.filter(c=>c.state==="missing").length,
+      incomplete:excludedCount>0||
+        numeric.length!==included.length||
+        cells.some(c=>c.state==="partial")||
+        overflow
+    };
+  });
+
+  const sourceMap=new Map();
+
+  reports.filter(r=>!r.blockers.length).forEach(r=>{
+    r.sources.forEach(src=>{
+      if(!sourceMap.has(src.id)){
+        sourceMap.set(src.id,{...src,usedStudents:0});
+      }
+      sourceMap.get(src.id).usedStudents++;
+    });
+  });
+
+  return{
+    reportType:"class-overview",
+    id:classes[0],
+    year:years[0],
+    klass:classes[0],
+    name:classes[0]+" 班級總覽",
+    options:reportOptions,
+    includeStudents:!!includeStudents,
+    rosterCount:rows.length,
+    includedCount:included.length,
+    excludedCount,
+    rows,metrics,
+    sources:[...sourceMap.values()].sort((a,b)=>
+      natural(a.typeLabel,b.typeLabel)||natural(a.name,b.name)
+    ),
+    warnings:oneOf(
+      reports.flatMap(r=>[...r.warnings,...r.blockers])
+    ),
+    notes:[
+      "統計只包含本學年、本班已匯入的學生，不等同校方正式全班名冊。學生搜尋、勾選及分頁不影響本報告。",
+      "「至少」表示只加總已知數值，並非完整全班統計。未提供、未列項、未能解析及待核對資料不會當作零。",
+      "遲到（UT08）、欠功課（HW）、用品、校服及常規項目為選用快照所載學年累積，不按日期篩選重算。UT01 不會換算或加進 UT08 遲到次數。",
+      "缺席合計以「學生×日期」計算：同一學生同日跨來源只計一次；兩位學生同日各有缺席日期則合計兩個。不是全日缺席天數，也不是班級唯一日曆日期數。",
+      "缺點及其他獎懲按所選日期統計有效次數，排除已豁免紀錄。日期、類別或豁免狀態待核對時，只統計可確認部分。",
+      "數值可解析不代表來源涵蓋完整或截至日一致；請一併檢視來源期間及統計截至日。"
+    ]
+  };
+}
+
+function currentClassOverviewReport(){
+  if(!state.klass)return null;
+
+  // 刻意不使用 filteredStudents()，忽略姓名搜尋及學生勾選。
+  const students=summaryStudents()
+    .filter(s=>s.klass===state.klass);
+
+  return buildClassOverviewReport(
+    students,configSnapshot(),classOverviewWithStudents
+  );
+}
+
+function classOverviewTotalText(m,withUnit=true){
+  if(m.total===null){
+    if(m.overflow||m.unparseable)return"待核對";
+    if(!m.included)return"未能統計";
+    return m.unlisted===m.included?"未列項":"未提供";
+  }
+
+  return(m.incomplete?"至少 ":"")+m.total+
+    (withUnit?" "+m.unit:"");
+}
+
+function classOverviewAffectedText(m){
+  if(!m.counted)return"未能確定";
+  return(m.incomplete?"至少 ":"")+m.affected+" 位";
+}
+
+function classOverviewGap(m,r){
+  const parts=[];
+
+  if(m.partial)parts.push("部分可解析 "+m.partial+" 位");
+  if(m.unparseable)parts.push("未能計數 "+m.unparseable+" 位");
+  if(m.unlisted)parts.push("未列項 "+m.unlisted+" 位");
+  if(m.missing)parts.push("未提供 "+m.missing+" 位");
+  if(r.excludedCount){
+    parts.push("另 "+r.excludedCount+" 位待核對，未納入");
+  }
+  if(m.overflow)parts.push("合計超出安全整數上限");
+
+  return parts.join("；")||"已匯入數值可計";
+}
+
+function classOverviewMetricRows(r,metrics=r.metrics){
+  return metrics.map(m=>[
+    m.label,m.basis,
+    classOverviewTotalText(m),
+    classOverviewAffectedText(m),
+    m.counted+" / "+r.includedCount+" 位",
+    classOverviewGap(m,r)
+  ]);
+}
+
+function classOverviewStudentText(v){
+  if(v.value!==null){
+    return String(v.value)+(v.state==="partial"?"（已知部分）":"");
+  }
+  return v.state==="unlisted"?"未列項":
+    v.state==="partial"?"待核對":"未提供";
+}
+
+function classOverviewStudentRows(r,interactive=false){
+  return r.rows.map(s=>[
+    interactive
+      ?button(s.id,()=>openStudent(s.key),"link-btn")
+      :s.id,
+    s.name,
+    ...CLASS_OVERVIEW_DEFS.slice(0,4).map(d=>
+      s.excluded?"未納入":classOverviewStudentText(s.values[d.key])
+    ),
+    s.status
+  ]);
+}
+
+function classOverviewSourceRows(r){
+  return r.sources.map(s=>[
+    s.typeLabel+"\n"+s.name+"\n"+s.scope,
+    s.period+"\n"+s.periodOrigin,
+    s.asOf,
+    "建立："+s.created+"\n最新事件："+s.latest,
+    s.usedStudents
+  ]);
+}
+
+/* ---------- 教師畫面 ---------- */
+
+function renderClassOverview(){
+  const host=$("teacherClassOverview");
+  if(!host)return;
+
+  host.replaceChildren(
+    node("div",{class:"section-head",style:"margin:0 0 12px"},
+      node("div",{},
+        node("div",{class:"kicker"},"TEACHER CLASS REPORT"),
+        node("h2",{},"教師班級整體紀錄")
+      ),
+      tag("獨立班級報告 · 校內用途","good")
+    )
+  );
+
+  const r=currentClassOverviewReport();
+
+  if(!r){
+    host.append(notice(
+      "請先匯入並確認來源，再於班級索引或班別篩選選擇一班。班級總覽與學生個別 PDF／ZIP 分開下載。"
+    ));
+    return;
+  }
+
+  const pdf=button(
+    "下載班級總覽 PDF",downloadClassOverviewPdf,"btn primary"
+  );
+  pdf.id="classOverviewPdf";
+
+  const csv=button(
+    "下載班級總覽 CSV",downloadClassOverviewCsv,"btn"
+  );
+  csv.id="classOverviewCsv";
+
+  const include=node("input",{
+    id:"classOverviewIncludeStudents",
+    type:"checkbox",
+    checked:classOverviewWithStudents,
+    onChange:e=>{
+      if(locked()){
+        e.target.checked=classOverviewWithStudents;
+        return;
+      }
+      classOverviewWithStudents=e.target.checked;
+      renderClassOverview();
+    }
+  });
+
+  host.append(
+    node("p",{class:"small muted"},
+      r.year+" / "+r.klass+" · 已匯入 "+r.rosterCount+
+      " 位 · 納入統計 "+r.includedCount+
+      " 位 · 待核對排除 "+r.excludedCount+
+      " 位。搜尋、勾選及分頁不影響本班總覽。"
+    ),
+    node("div",{class:"flex between wrap",style:"margin:12px 0"},
+      node("label",{class:"check-line"},
+        include,"顯示並在班級報告加入學生明細（選填）"
+      ),
+      node("div",{class:"flex wrap"},pdf,csv)
+    ),
+    notice(
+      "缺席及獎懲按選定日期統計；遲到、欠功課等仍為來源學年累積。未提供／未列項不作零；「至少」只表示已知合計。"
+    )
+  );
+
+  if(r.excludedCount){
+    host.append(
+      notice(
+        r.excludedCount+" 位學生尚有身分／快照核對阻擋，沒有納入合計。請先處理核對中心，或勾選學生明細查看原因。",
+        "warn"
+      ),
+      button(
+        "前往核對中心",()=>setView("review"),
+        "btn compact",locked()
+      )
+    );
+  }
+
+  host.append(
+    node("div",{class:"kpis"},
+      r.metrics.slice(0,4).map(m=>node("div",{class:"kpi"},
+        node("div",{class:"kpi-label"},m.label),
+        node("div",{class:"kpi-number"},
+          classOverviewTotalText(m,false)),
+        node("div",{class:"kpi-note"},
+          "單位："+m.unit+" · "+m.basis+"\n"+
+          "具列示紀錄："+classOverviewAffectedText(m)+
+          "；可計數 "+m.counted+" / "+r.includedCount+" 位")
+      ))
+    ),
+    miniTable(
+      CLASS_OVERVIEW_HEADERS,
+      classOverviewMetricRows(r,r.metrics.slice(0,4))
+    ),
+    node("details",{},
+      node("summary",{},"其他獎懲、用品、校服及常規整體數據"),
+      miniTable(
+        CLASS_OVERVIEW_HEADERS,
+        classOverviewMetricRows(r,r.metrics.slice(4))
+      )
+    ),
+    node("details",{},
+      node("summary",{},"統計說明、來源及核對提示"),
+      node("ul",{class:"detail-list"},
+        [...r.notes,...r.warnings].map(t=>node("li",{},t))
+      ),
+      r.sources.length
+        ?miniTable(
+          CLASS_OVERVIEW_SOURCE_HEADERS,
+          classOverviewSourceRows(r)
+        )
+        :empty("沒有已納入統計的適用來源。")
+    )
+  );
+
+  if(r.includeStudents){
+    host.append(
+      node("div",{
+        class:"class-overview-students",style:"margin-top:18px"
+      },
+        node("h3",{style:"margin-bottom:10px"},"全班學生明細"),
+        miniTable(
+          CLASS_OVERVIEW_STUDENT_HEADERS,
+          classOverviewStudentRows(r,true)
+        )
+      )
+    );
+  }
+
+  updateClassOverviewButtons();
+}
+
+function updateClassOverviewButtons(){
+  const available=!!state.klass&&summaryStudents()
+    .some(s=>s.klass===state.klass);
+  const disabled=locked()||!available;
+
+  if($("classOverviewPdf")){
+    $("classOverviewPdf").disabled=disabled||!pdfReady();
+  }
+  if($("classOverviewCsv")){
+    $("classOverviewCsv").disabled=disabled;
+  }
+  if($("classOverviewIncludeStudents")){
+    $("classOverviewIncludeStudents").disabled=locked();
+  }
+}
+
+/* ---------- 獨立班級 A4 報告 ---------- */
+
+function createClassOverviewPage(r,continuation){
+  const page=node("article",{
+    class:"report-page internal-report class-overview-report",
+    "data-report-type":"class-overview",
+    "data-pdf-audience":"internal"
+  });
+
+  const header=node("header",{class:"report-header"});
+
+  if(continuation){
+    header.append(node("div",{class:"report-continuation"},
+      node("span",{},r.options.title+"（續）"),
+      node("span",{},r.year+" · "+r.klass+" 班")
+    ));
+  }else{
+    const shownYear=r.options.yearDisplay&&
+      r.options.yearDisplay!==r.year
+        ?r.options.yearDisplay+"（來源學年："+r.year+"）"
+        :r.year+" 學年度";
+
+    header.append(
+      node("div",{class:"report-school"},
+        r.options.school||"〔學校名稱未設定〕"),
+      node("div",{class:"report-year"},shownYear),
+      node("div",{class:"report-title"},r.options.title),
+      node("div",{class:"report-rule"}),
+      node("div",{class:"report-meta"},
+        node("div",{},"班別："+r.klass),
+        node("div",{},"建立日期："+r.options.created),
+        node("div",{class:"full"},
+          "已匯入："+r.rosterCount+" 位；納入統計："+r.includedCount+
+          " 位；待核對排除："+r.excludedCount+" 位"),
+        node("div",{class:"full"},
+          "缺席／獎懲日期範圍："+
+          periodText(r.options.start,r.options.end)),
+        node("div",{class:"full"},
+          "遲到／欠功課等：來源所載學年累積，不按日期重算"),
+        node("div",{class:"full"},
+          "測試學生："+(
+            r.options.includeTests?"已包括":"已排除 7C／s7-Test*"
+          ))
+      )
+    );
+  }
+
+  const body=node("div",{class:"report-body"});
+  const footer=node("footer",{class:"report-footer"},
+    node("span",{},"校內班級整體數據 · 按已匯入來源整理"),
+    node("span",{class:"page-number"},"")
+  );
+
+  page.append(header,body,footer);
+  return{page,body,footer};
+}
+
+function makeClassOverviewSpecs(r){
+  const specs=[
+    headingSpec("一．班級整體數據"),
+    tableSpec(
+      "",CLASS_OVERVIEW_HEADERS,
+      classOverviewMetricRows(r),
+      [17,13,13,15,12,30]
+    ),
+    headingSpec("二．統計說明與核對提示"),
+    ...r.notes.map(t=>paragraphSpec("• "+t,true)),
+    ...r.warnings.map(t=>paragraphSpec("• "+t,true))
+  ];
+
+  if(r.sources.length){
+    specs.push(
+      headingSpec("三．資料來源"),
+      tableSpec(
+        "",CLASS_OVERVIEW_SOURCE_HEADERS,
+        classOverviewSourceRows(r),
+        [25,24,17,24,10]
+      )
+    );
+  }
+
+  if(r.includeStudents){
+    specs.push(
+      headingSpec("學生明細（選填）"),
+      tableSpec(
+        "",CLASS_OVERVIEW_STUDENT_HEADERS,
+        classOverviewStudentRows(r),
+        [13,13,10,11,10,11,32]
+      )
+    );
+  }
+
+  if(r.options.issuer){
+    specs.push(paragraphSpec(
+      "編製部門："+r.options.issuer,true
+    ));
+  }
+
+  return specs;
+}
+
+/* ---------- CSV：UTF-8 BOM + 試算表公式注入防護 ---------- */
+
+function classOverviewCsvCell(value){
+  let text=String(value??"");
+
+  if(
+    /^[\s\uFEFF]*[=+\-@]/.test(text)||
+    /^[\t\r\n]/.test(text)
+  ){
+    text="'"+text;
+  }
+
+  return'"'+text.replaceAll('"','""')+'"';
+}
+
+function classOverviewCsv(r){
+  const rows=[
+    ["報告類型","班級整體紀錄總覽（校內）"],
+    ["學校",r.options.school||"未設定"],
+    ["學年",r.year],
+    ["班別",r.klass],
+    ["建立日期",r.options.created],
+    ["缺席／獎懲日期範圍",
+      periodText(r.options.start,r.options.end)],
+    ["累積項目口徑","來源所載學年累積，不按日期重算"],
+    ["已匯入學生數",r.rosterCount],
+    ["納入統計學生數",r.includedCount],
+    ["待核對排除學生數",r.excludedCount],
+    ["學生明細",r.includeStudents?"包含":"不包含"],
+    ["測試學生",r.options.includeTests?"包括":"排除"],
+    [],
+    [
+      "項目","統計口徑","已知合計","單位",
+      "具列示紀錄學生數","可計數學生數",
+      "納入學生數","數值完整度","資料缺口"
+    ],
+    ...r.metrics.map(m=>[
+      m.label,m.basis,
+      m.total===null?"":m.total,
+      m.unit,
+      m.counted?m.affected:"",
+      m.counted,r.includedCount,
+      m.incomplete?"已知部分":"已匯入數值可計",
+      classOverviewGap(m,r)
+    ]),
+    [],
+    ["統計說明"],
+    ...r.notes.map(t=>[t]),
+    [],
+    ["核對提示"],
+    ...r.warnings.map(t=>[t]),
+    [],
+    ["資料來源"],
+    CLASS_OVERVIEW_SOURCE_HEADERS,
+    ...classOverviewSourceRows(r)
+  ];
+
+  if(r.includeStudents){
+    rows.push(
+      [],
+      ["學生明細"],
+      CLASS_OVERVIEW_STUDENT_HEADERS,
+      ...classOverviewStudentRows(r)
+    );
+  }
+
+  return rows.map(row=>
+    row.map(classOverviewCsvCell).join(",")
+  ).join("\r\n")+"\r\n";
+}
+
+function classOverviewFilename(r,extension){
+  return safeFilename(
+    "ClassOverview_"+r.klass+"_"+r.year+"_"+
+    exportPeriodToken(r.options)+"_"+
+    (r.includeStudents?"WithStudents":"Summary")+"."+extension
+  );
+}
+
+function downloadClassOverviewCsv(){
+  if(locked()){
+    toast("目前有工作進行中，請稍後下載。");
+    return;
+  }
+
+  const r=currentClassOverviewReport();
+  if(!r){
+    toast("請先選擇有已匯入學生的班別。");
+    return;
+  }
+
+  const blob=new Blob(
+    ["\uFEFF"+classOverviewCsv(r)],
+    {type:"text/csv;charset=utf-8"}
+  );
+
+  downloadBlob(blob,classOverviewFilename(r,"csv"));
+  toast("已交由瀏覽器下載班級總覽 CSV，可使用 Excel 開啟。");
+}
+
+/* ---------- 一份班級 PDF，不建立學生 PDF 或 ZIP ---------- */
+
+async function downloadClassOverviewPdf(){
+  if(locked()){
+    toast("目前有工作進行中，請稍後下載。");
+    return;
+  }
+  if(!pdfReady()){
+    toast("PDF 工具未載入，請重試工具庫。");
+    return;
+  }
+
+  const current=currentClassOverviewReport();
+  if(!current){
+    toast("請先選擇有已匯入學生的班別。");
+    return;
+  }
+  if(!clean(current.options.school)){
+    toast("請先填寫學校名稱並套用設定。");
+    setView("settings");
+    $("schoolName").focus();
+    return;
+  }
+
+  // 固定本次統計，不受後續設定變更影響。
+  const r=JSON.parse(JSON.stringify(current));
+
+  state.busy=true;
+  state.cancel=false;
+  state.artifacts=[];
+  updateExportButtons();
+
+  const status=node("p",{},"正在量度班級總覽 A4 分頁…");
+  const fill=node("div",{class:"progress-fill"});
+  const results=node("div");
+
+  const close=button("關閉",closeExport,"btn",true);
+  const cancel=button("取消建立",()=>{
+    state.cancel=true;
+    cancel.disabled=true;
+    status.textContent="將於目前安全步驟完成後停止。";
+  },"btn danger");
+
+  $("exportContent").replaceChildren(
+    node("div",{class:"dialog-head"},
+      node("h2",{id:"exportHeading"},
+        r.klass+" 班級總覽 PDF"),
+      close
+    ),
+    node("div",{class:"dialog-body"},
+      notice(
+        "本次只建立一份班級整體報告，不會建立或下載個別學生 PDF。"
+      ),
+      node("div",{class:"progress-track"},fill),
+      status,results
+    ),
+    node("div",{class:"dialog-actions"},cancel)
+  );
+
+  openDialog($("exportDialog"));
+
+  try{
+    const data=await createPdf(r,message=>{
+      status.textContent=message;
+      const match=/第 (\d+)／(\d+) 頁/.exec(message);
+
+      if(match){
+        fill.style.width=
+          Math.round((Number(match[1])-1)/Number(match[2])*100)+"%";
+      }
+    });
+
+    abortIfRequested();
+
+    const artifact={
+      name:classOverviewFilename(r,"pdf"),
+      blob:new Blob([data],{type:"application/pdf"})
+    };
+
+    state.artifacts=[artifact];
+    fill.style.width="100%";
+    status.textContent="班級總覽 PDF 已建立，已發出下載要求。";
+
+    results.append(
+      node("div",{class:"artifact"},
+        node("div",{},
+          node("div",{class:"filename"},artifact.name),
+          node("div",{class:"small muted"},
+            bytesLabel(artifact.blob.size)+" · 校內班級報告")
+        ),
+        button("再次下載 PDF",()=>{
+          downloadBlob(artifact.blob,artifact.name);
+        },"btn primary compact")
+      ),
+      empty(
+        "如瀏覽器沒有自動下載，請按「再次下載 PDF」。關閉視窗會釋放本次建立的檔案。"
+      )
+    );
+
+    downloadBlob(artifact.blob,artifact.name);
+    toast("已交由瀏覽器下載班級總覽 PDF，請檢查下載清單。");
+  }catch(e){
+    const cancelled=e instanceof Cancelled;
+
+    status.textContent=cancelled?"已取消建立。":"班級 PDF 建立失敗。";
+    results.append(notice(
+      cancelled
+        ?"本次未產生可下載 PDF。"
+        :"錯誤："+(e.message||String(e)),
+      cancelled?"warn":"error"
+    ));
+  }finally{
+    $("renderStage").replaceChildren();
+    state.busy=false;
+    state.cancel=false;
+    cancel.disabled=true;
+    close.disabled=false;
+    updateExportButtons();
+    $("liveStatus").textContent="班級總覽 PDF 工作結束。";
+  }
+}
+
 /* ==================== 匿名自測，不加入正式名單 ==================== */
 
 function anonymousStudentText(
@@ -4417,8 +5243,9 @@ async function runSelfTests(){
   }
 
   state.testing=true;
+  updateExportButtons();
   $("testContent").replaceChildren(notice(
-    "匿名 fixture 測試，不會加入正式名單。包括來源解析、家長版內容隔離、校內版紀錄保留及 A4 分頁。"
+    "匿名 fixture 測試，不會加入正式名單。包括來源解析、家長版內容隔離、校內版紀錄保留、班級總覽統計及 A4 分頁。"
   ));
   $("testClose").disabled=true;
   openDialog($("testDialog"));
@@ -4443,6 +5270,99 @@ async function runSelfTests(){
   };
 
   try{
+    await test("班級總覽：去重、豁免、資料缺口、日期口徑及 A4 分頁",async()=>{
+      const main=fixtureSource(
+        anonymousStudentText("1A",1,"匿名甲",[
+          ["UT08 遲到",2,""],
+          ["HW 欠交功課",3,""]
+        ],[
+          ["2026-09-10","缺點2次","匿名原因","-10","---","---"],
+          ["2026-09-11","缺點1次","匿名原因","-5","---","Yes"]
+        ])+
+        anonymousStudentText("1A",2,"匿名乙",[
+          ["UT08 遲到",0,""],
+          ["HW 欠交功課",5,""]
+        ]),
+        "fixture-class-main.csv"
+      );
+
+      const absence=fixtureSource(
+        "班別\t學號\t學生\t缺席日子\n"+
+        "1A\t1\t匿名甲\t2026-09-10, 2026-09-10\n"+
+        "1A\t2\t匿名乙\t2026-09-10\n"+
+        "1A\t3\t匿名丙\t2026-09-12\n",
+        "fixture-class-absence.csv"
+      );
+
+      const students=assembleStudents([main,absence],emptyPicks());
+      const options={
+        ...configSnapshot(),
+        school:"匿名測試學校",
+        yearDisplay:"",
+        pdfAudience:"parent",
+        start:"2026-09-01",
+        end:"2026-09-30"
+      };
+
+      const r=buildClassOverviewReport(students,options,false);
+      const metric=(report,key)=>report.metrics.find(m=>m.key===key);
+
+      assert(r.rosterCount===3&&r.includedCount===3);
+      assert(metric(r,"late").total===2);
+      assert(metric(r,"hw").total===8);
+      assert(metric(r,"hw").missing===1);
+      assert(metric(r,"hw").incomplete);
+      assert(metric(r,"absence").total===3);
+      assert(metric(r,"demerit").total===2);
+      assert(r.options.pdfAudience==="internal");
+
+      assert(
+        !JSON.stringify(makeClassOverviewSpecs(r)).includes("匿名甲"),
+        "預設班級報告不應加入學生明細"
+      );
+
+      const later=buildClassOverviewReport(students,{
+        ...options,start:"2026-09-12"
+      },false);
+
+      assert(metric(later,"absence").total===1);
+      assert(metric(later,"demerit").total===0);
+      assert(metric(later,"late").total===2);
+      assert(metric(later,"hw").total===8);
+
+      const absenceOnly=buildClassOverviewReport(
+        assembleStudents([absence],emptyPicks()),options,false
+      );
+      assert(metric(absenceOnly,"late").total===null);
+      assert(metric(absenceOnly,"hw").total===null);
+
+      const overlap=fixtureSource(
+        anonymousStudentText("1A",1,"匿名甲",[
+          ["HW 欠交功課",99,""]
+        ]),
+        "fixture-class-overlap.csv"
+      );
+      const unresolved=buildClassOverviewReport(
+        assembleStudents([main,absence,overlap],emptyPicks()),
+        options,false
+      );
+      assert(unresolved.excludedCount===1);
+      assert(metric(unresolved,"hw").total===5);
+
+      assert(classOverviewCsvCell("=1+1")==="\"'=1+1\"");
+
+      try{
+        const pages=await paginateReport(r,$("renderStage"));
+        assert(pages.length>=1);
+        assert(pages.every(page=>{
+          const body=page.querySelector(".report-body");
+          return body.scrollHeight<=body.clientHeight+1;
+        }));
+      }finally{
+        $("renderStage").replaceChildren();
+      }
+    });
+
     await test("UTF-8 BOM、CRLF、Tab 及分段解析",()=>{
       const p=parseSourceText(
         "\uFEFF"+anonymousStudentText(
@@ -4813,6 +5733,7 @@ async function runSelfTests(){
     state.testing=false;
     $("testClose").disabled=false;
     $("renderStage").replaceChildren();
+    updateExportButtons();
 
     $("testContent").prepend(notice(
       "自測完成：通過 "+pass+" 項；失敗 "+fail+" 項。"+
@@ -4899,6 +5820,7 @@ $("fontInput").addEventListener("change",async e=>{
   }
 
   state.rendering=true;
+  updateExportButtons();
   $("fontStatus").textContent="載入本機字型…";
 
   try{
@@ -4973,6 +5895,8 @@ async function clearSession(){
   state.currentStudentKey=null;
   state.previewReport=null;
   state.artifacts=[];
+  state.cancel=false;
+  classOverviewWithStudents=false;
 
   $("renderStage").replaceChildren();
   $("importProgress").textContent="";
@@ -4990,6 +5914,7 @@ document.querySelectorAll("[data-view]").forEach(b=>{
 });
 
 $("beginImport").addEventListener("click",()=>{
+  if(locked())return;
   setView("import");
   $("fileInput").click();
 });
